@@ -1,65 +1,121 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Stream Recorder</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FFmpeg Stream Recorder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            max-width: 600px;
+        }
+        label {
+            font-weight: bold;
+        }
+        input, button {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 8px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
 </head>
 <body>
-    <h2>Internet Radio Recorder</h2>
-    <form id="streamForm">
-        <label>Stream URL: <input type="text" id="streamUrl" required></label><br>
-        <label>Total Recording Time (hours): <input type="number" id="totalTime" required></label><br>
-        <label>Chunk Length (minutes): <input type="number" id="chunkSize" required></label><br>
-        <label>Fade In (seconds): <input type="number" id="fadeIn" required></label><br>
-        <label>Fade Out (seconds): <input type="number" id="fadeOut" required></label><br>
-        <button type="button" onclick="generateScript()">Download Script</button>
+
+    <h2>FFmpeg Stream Recorder</h2>
+    <form id="ffmpeg-form">
+        <label for="stream_url">Stream URL:</label>
+        <input type="text" id="stream_url" required>
+
+        <label for="duration">Total Recording Time (seconds):</label>
+        <input type="number" id="duration" required>
+
+        <label for="chunk_length">Chunk Length (seconds):</label>
+        <input type="number" id="chunk_length" required>
+
+        <label for="fade_duration">Fade In/Out Duration (seconds):</label>
+        <input type="number" id="fade_duration" required>
+
+        <button type="button" onclick="generateScript()">Generate Script</button>
     </form>
+
+    <h3>Generated Batch Script:</h3>
+    <pre id="script-output"></pre>
+    <button onclick="downloadScript()">Download Script</button>
 
     <script>
         function generateScript() {
-            const url = document.getElementById("streamUrl").value;
-            const totalTime = document.getElementById("totalTime").value * 3600;
-            const chunkSize = document.getElementById("chunkSize").value * 60;
-            const fadeIn = document.getElementById("fadeIn").value;
-            const fadeOut = document.getElementById("fadeOut").value;
+            const streamUrl = document.getElementById("stream_url").value;
+            const duration = document.getElementById("duration").value;
+            const chunkLength = document.getElementById("chunk_length").value;
+            const fadeDuration = document.getElementById("fade_duration").value;
 
-            const scriptContent = `@echo off
-set FFmpegURL=https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
-set "StreamURL=${url}"
-set "TotalTime=${totalTime}"
-set "ChunkSize=${chunkSize}"
-set "FadeIn=${fadeIn}"
-set "FadeOut=${fadeOut}"
-set "FFmpegBin=ffmpeg.exe"
+            const script = `@echo off
+setlocal enabledelayedexpansion
 
-if not exist %FFmpegBin% (
-    echo Downloading FFmpeg...
-    powershell -command "& {Invoke-WebRequest %FFmpegURL% -OutFile ffmpeg.zip}"
-    tar -xf ffmpeg.zip
-    move ffmpeg-*/bin/ffmpeg.exe .
-    del ffmpeg.zip
+:: Define variables
+set "FFMPEG_URL=https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-latest-full_build.7z"
+set "FFMPEG_DIR=ffmpeg"
+set "FFMPEG_EXE=%FFMPEG_DIR%\\bin\\ffmpeg.exe"
+set "STREAM_URL=${streamUrl}"
+set "OUTPUT_FILE=full_record.mp3"
+set "DURATION=${duration}"
+set "CHUNK_LENGTH=${chunkLength}"
+set "FADE_DURATION=${fadeDuration}"
+
+:: Check if FFmpeg is installed
+if not exist "%FFMPEG_EXE%" (
+    echo Downloading and extracting FFmpeg...
+    powershell -Command "(New-Object Net.WebClient).DownloadFile('%FFMPEG_URL%', 'ffmpeg.7z')"
+    7z x ffmpeg.7z -o%FFMPEG_DIR% -y
+) else (
+    echo FFmpeg already installed.
 )
 
+:: Start recording
 echo Recording Stream...
-%FFmpegBin% -i "%StreamURL%" -t %TotalTime% -c copy "full_record.mp3"
-
-echo Splitting and Adding Fade Effects...
-for /L %%i in (0, %ChunkSize%, %TotalTime%) do (
-    set /A end=%%i+%ChunkSize%
-    %FFmpegBin% -i "full_record.mp3" -ss %%i -t %ChunkSize% -af "afade=t=in:ss=0:d=%FadeIn%,afade=t=out:st=%ChunkSize%-FadeOut:d=%FadeOut%" "chunk_%%i.mp3"
+"%FFMPEG_EXE%" -y -i "%STREAM_URL%" -t %DURATION% -c copy "%OUTPUT_FILE%"
+if %errorlevel% neq 0 (
+    echo Error recording stream.
+    exit /b 1
 )
 
-echo Done!
-pause
-`;
+:: Split and apply fade effects
+echo Splitting and Adding Fade Effects...
+set /a "fade_start=%CHUNK_LENGTH% - %FADE_DURATION%"
 
+"%FFMPEG_EXE%" -y -i "%OUTPUT_FILE%" -af "afade=t=in:st=0:d=%FADE_DURATION%,afade=t=out:st=%fade_start%:d=%FADE_DURATION%" "output_with_fade.mp3"
+if %errorlevel% neq 0 (
+    echo Error processing fade effect.
+    exit /b 1
+)
+
+echo Process completed successfully.
+exit /b 0`;
+
+            document.getElementById("script-output").innerText = script;
+        }
+
+        function downloadScript() {
+            const scriptContent = document.getElementById("script-output").innerText;
             const blob = new Blob([scriptContent], { type: "text/plain" });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = "record_stream.bat";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "ffmpeg_script.bat";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
     </script>
+
 </body>
 </html>
