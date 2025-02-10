@@ -77,7 +77,7 @@ if not exist "%OUTPUT_DIR%" (
 
 :: Start recording
 echo Recording Stream...
-ffmpeg -y -i "%STREAM_URL%" -t %DURATION% -c copy "full_record.mp3"
+ffmpeg -y -i "%STREAM_URL%" -t %DURATION% -c copy -thread_queue_size 512 "full_record.mp3"
 if %errorlevel% neq 0 (
     echo Error recording stream.
     exit /b 1
