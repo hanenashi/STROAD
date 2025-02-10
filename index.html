@@ -63,7 +63,7 @@
 setlocal enabledelayedexpansion
 
 :: Define variables
-set "FFMPEG_URL=https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-latest-full_build.7z"
+set "FFMPEG_URL=https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-latest-full_build.zip"
 set "FFMPEG_DIR=ffmpeg"
 set "FFMPEG_EXE=%FFMPEG_DIR%\\bin\\ffmpeg.exe"
 set "STREAM_URL=${streamUrl}"
@@ -75,8 +75,8 @@ set "FADE_DURATION=${fadeDuration}"
 :: Check if FFmpeg is installed
 if not exist "%FFMPEG_EXE%" (
     echo Downloading and extracting FFmpeg...
-    powershell -Command "(New-Object Net.WebClient).DownloadFile('%FFMPEG_URL%', 'ffmpeg.7z')"
-    7z x ffmpeg.7z -o%FFMPEG_DIR% -y
+    powershell -Command "(New-Object Net.WebClient).DownloadFile('%FFMPEG_URL%', 'ffmpeg.zip')"
+    powershell -Command "Expand-Archive -Path 'ffmpeg.zip' -DestinationPath '%FFMPEG_DIR%' -Force"
 ) else (
     echo FFmpeg already installed.
 )
