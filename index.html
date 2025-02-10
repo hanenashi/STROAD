@@ -85,8 +85,8 @@ if %errorlevel% neq 0 (
 
 :: Split into chunks and apply fade effects
 echo Splitting and Adding Fade Effects...
-set /a "num_chunks=%DURATION% / %CHUNK_LENGTH%"
-for /L %%i in (0,1,%num_chunks%) do (
+set /a "num_chunks=(%DURATION% + %CHUNK_LENGTH% - 1) / %CHUNK_LENGTH%"
+for /L %%i in (0,1,%num_chunks%-1) do (
     set /a "start_time=%%i * %CHUNK_LENGTH%"
     set /a "fade_out_start=%CHUNK_LENGTH% - %FADE_DURATION%"
     set "output_file=%OUTPUT_DIR%\\%OUTPUT_FILE%%%i.mp3"
