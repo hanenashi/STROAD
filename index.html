@@ -88,8 +88,9 @@ echo Splitting and Adding Fade Effects...
 set /a "num_chunks=%DURATION% / %CHUNK_LENGTH%"
 for /L %%i in (0,1,%num_chunks%) do (
     set /a "start_time=%%i * %CHUNK_LENGTH%"
+    set /a "fade_out_start=%CHUNK_LENGTH% - %FADE_DURATION%"
     set "output_file=%OUTPUT_DIR%\\%OUTPUT_FILE%%%i.mp3"
-    ffmpeg -y -i "full_record.mp3" -ss !start_time! -t %CHUNK_LENGTH% -af "afade=t=in:st=0:d=%FADE_DURATION%,afade=t=out:st=%CHUNK_LENGTH%-%FADE_DURATION%:d=%FADE_DURATION%" "!output_file!"
+    ffmpeg -y -i "full_record.mp3" -ss !start_time! -t %CHUNK_LENGTH% -af "afade=t=in:st=0:d=%FADE_DURATION%,afade=t=out:st=!fade_out_start!:d=%FADE_DURATION%" "!output_file!"
     if %errorlevel% neq 0 (
         echo Error processing chunk %%i.
         exit /b 1
