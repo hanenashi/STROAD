@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stream Recorder</title>
+</head>
+<body>
+    <h2>Internet Radio Recorder</h2>
+    <form id="streamForm">
+        <label>Stream URL: <input type="text" id="streamUrl" required></label><br>
+        <label>Total Recording Time (hours): <input type="number" id="totalTime" required></label><br>
+        <label>Chunk Length (minutes): <input type="number" id="chunkSize" required></label><br>
+        <label>Fade In (seconds): <input type="number" id="fadeIn" required></label><br>
+        <label>Fade Out (seconds): <input type="number" id="fadeOut" required></label><br>
+        <button type="button" onclick="generateScript()">Download Script</button>
+    </form>
+
+    <script>
+        function generateScript() {
+            const url = document.getElementById("streamUrl").value;
+            const totalTime = document.getElementById("totalTime").value * 3600;
+            const chunkSize = document.getElementById("chunkSize").value * 60;
+            const fadeIn = document.getElementById("fadeIn").value;
+            const fadeOut = document.getElementById("fadeOut").value;
+
+            const scriptContent = `@echo off
+set FFmpegURL=https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+set "StreamURL=${url}"
+set "TotalTime=${totalTime}"
+set "ChunkSize=${chunkSize}"
+set "FadeIn=${fadeIn}"
+set "FadeOut=${fadeOut}"
+set "FFmpegBin=ffmpeg.exe"
+
+if not exist %FFmpegBin% (
+    echo Downloading FFmpeg...
+    powershell -command "& {Invoke-WebRequest %FFmpegURL% -OutFile ffmpeg.zip}"
+    tar -xf ffmpeg.zip
+    move ffmpeg-*/bin/ffmpeg.exe .
+    del ffmpeg.zip
+)
+
+echo Recording Stream...
+%FFmpegBin% -i "%StreamURL%" -t %TotalTime% -c copy "full_record.mp3"
+
+echo Splitting and Adding Fade Effects...
+for /L %%i in (0, %ChunkSize%, %TotalTime%) do (
+    set /A end=%%i+%ChunkSize%
+    %FFmpegBin% -i "full_record.mp3" -ss %%i -t %ChunkSize% -af "afade=t=in:ss=0:d=%FadeIn%,afade=t=out:st=%ChunkSize%-FadeOut:d=%FadeOut%" "chunk_%%i.mp3"
+)
+
+echo Done!
+pause
+`;
+
+            const blob = new Blob([scriptContent], { type: "text/plain" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "record_stream.bat";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
