@@ -92,8 +92,12 @@ rem Step 2: Apply fade-in and fade-out to each chunk and rename
 echo Applying fade-in and fade-out to each chunk...
 set /a count=1
 FOR %%A IN (temp_chunk*.mp3) DO (
-    ffmpeg -i %%A -filter_complex "afade=d=${fadeDuration}, areverse, afade=d=${fadeDuration}, areverse" -thread_queue_size 512 "${chunkName}_!count!.mp3"
+    setlocal enabledelayedexpansion
+    set "padded_count=00!count!"
+    set "padded_count=!padded_count:~-3!"
+    ffmpeg -i %%A -filter_complex "afade=d=${fadeDuration}, areverse, afade=d=${fadeDuration}, areverse" -thread_queue_size 512 "${chunkName}_!padded_count!.mp3"
     del %%A
+    endlocal
     set /a count+=1
 )
 
