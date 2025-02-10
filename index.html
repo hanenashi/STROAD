@@ -14,18 +14,15 @@
         label {
             font-weight: bold;
         }
-        input, button {
+        input, button, textarea {
             display: block;
             width: 100%;
             margin: 10px 0;
             padding: 8px;
         }
-        pre {
-            background: #f4f4f4;
-            padding: 10px;
-            border-radius: 5px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
+        textarea {
+            height: 300px;
+            resize: vertical;
         }
     </style>
 </head>
@@ -46,7 +43,7 @@
     </form>
 
     <h3>Generated Batch Script:</h3>
-    <pre id="script-output"></pre>
+    <textarea id="script-output"></textarea>
     <button onclick="downloadScript()">Download Script</button>
 
     <script>
@@ -66,16 +63,16 @@ set CHUNK_DURATION=${chunkLength}
 
 rem Step 1: Download the stream and split into chunks
 echo Recording stream for %DOWNLOAD_TIME% seconds...
-ffmpeg -i %STREAM_URL% -t %DOWNLOAD_TIME% -c copy temp_stream.mp3
+ffmpeg -thread_queue_size 512 -i %STREAM_URL% -t %DOWNLOAD_TIME% -c copy temp_stream.mp3
 
 rem Split the downloaded stream into chunks
 echo Splitting the recorded stream into %CHUNK_DURATION%-second chunks...
-ffmpeg -i temp_stream.mp3 -f segment -segment_time %CHUNK_DURATION% -c copy chunk%%03d.mp3
+ffmpeg -thread_queue_size 512 -i temp_stream.mp3 -f segment -segment_time %CHUNK_DURATION% -c copy jazz%%03d.mp3
 
 rem Step 2: Apply fade-in and fade-out to each chunk
 echo Applying fade-in and fade-out to each chunk...
-FOR %%A IN (chunk*.mp3) DO (
-    ffmpeg -i %%A -filter_complex "afade=d=2, areverse, afade=d=2, areverse" "%%~dpnA_NEW.mp3"
+FOR %%A IN (jazz*.mp3) DO (
+    ffmpeg -i %%A -filter_complex "afade=d=2, areverse, afade=d=2, areverse" -thread_queue_size 512 "%%~dpnA_NEW.mp3"
     del %%A
 )
 
@@ -83,11 +80,11 @@ rem Clean up the temporary file
 del temp_stream.mp3
 echo Done!`;
 
-            document.getElementById("script-output").innerText = script;
+            document.getElementById("script-output").value = script;
         }
 
         function downloadScript() {
-            const scriptContent = document.getElementById("script-output").innerText;
+            const scriptContent = document.getElementById("script-output").value;
             const blob = new Blob([scriptContent], { type: "text/plain" });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
