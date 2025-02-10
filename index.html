@@ -103,7 +103,7 @@ echo Done!`;
             const blob = new Blob([scriptContent], { type: "text/plain" });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = "ffmpeg_script.bat";
+            a.download = "stroad.bat";
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
