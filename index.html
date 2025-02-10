@@ -64,27 +64,36 @@ setlocal enabledelayedexpansion
 
 :: Define variables
 set "STREAM_URL=${streamUrl}"
-set "OUTPUT_FILE=full_record.mp3"
 set "DURATION=${duration}"
 set "CHUNK_LENGTH=${chunkLength}"
 set "FADE_DURATION=${fadeDuration}"
+set "OUTPUT_DIR=chunks"
+set "OUTPUT_FILE=chunk_"
+
+:: Create output directory
+if not exist "%OUTPUT_DIR%" (
+    mkdir "%OUTPUT_DIR%"
+)
 
 :: Start recording
 echo Recording Stream...
-ffmpeg -y -i "%STREAM_URL%" -t %DURATION% -c copy "%OUTPUT_FILE%"
+ffmpeg -y -i "%STREAM_URL%" -t %DURATION% -c copy "full_record.mp3"
 if %errorlevel% neq 0 (
     echo Error recording stream.
     exit /b 1
 )
 
-:: Split and apply fade effects
+:: Split into chunks and apply fade effects
 echo Splitting and Adding Fade Effects...
-set /a "fade_start=%CHUNK_LENGTH% - %FADE_DURATION%"
-
-ffmpeg -y -i "%OUTPUT_FILE%" -af "afade=t=in:st=0:d=%FADE_DURATION%,afade=t=out:st=%fade_start%:d=%FADE_DURATION%" "output_with_fade.mp3"
-if %errorlevel% neq 0 (
-    echo Error processing fade effect.
-    exit /b 1
+set /a "num_chunks=%DURATION% / %CHUNK_LENGTH%"
+for /L %%i in (0,1,%num_chunks%) do (
+    set /a "start_time=%%i * %CHUNK_LENGTH%"
+    set "output_file=%OUTPUT_DIR%\\%OUTPUT_FILE%%%i.mp3"
+    ffmpeg -y -i "full_record.mp3" -ss !start_time! -t %CHUNK_LENGTH% -af "afade=t=in:st=0:d=%FADE_DURATION%,afade=t=out:st=%CHUNK_LENGTH%-%FADE_DURATION%:d=%FADE_DURATION%" "!output_file!"
+    if %errorlevel% neq 0 (
+        echo Error processing chunk %%i.
+        exit /b 1
+    )
 )
 
 echo Process completed successfully.
