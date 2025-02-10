@@ -34,16 +34,13 @@
     <h2>FFmpeg Stream Recorder</h2>
     <form id="ffmpeg-form">
         <label for="stream_url">Stream URL:</label>
-        <input type="text" id="stream_url" required>
+        <input type="text" id="stream_url" value="https://live.amperwave.net/direct/ppm-jazz24mp3-ibc1" required>
 
         <label for="duration">Total Recording Time (seconds):</label>
         <input type="number" id="duration" required>
 
         <label for="chunk_length">Chunk Length (seconds):</label>
         <input type="number" id="chunk_length" required>
-
-        <label for="fade_duration">Fade In/Out Duration (seconds):</label>
-        <input type="number" id="fade_duration" required>
 
         <button type="button" onclick="generateScript()">Generate Script</button>
     </form>
@@ -57,48 +54,34 @@
             const streamUrl = document.getElementById("stream_url").value;
             const duration = document.getElementById("duration").value;
             const chunkLength = document.getElementById("chunk_length").value;
-            const fadeDuration = document.getElementById("fade_duration").value;
 
             const script = `@echo off
-setlocal enabledelayedexpansion
 
-:: Define variables
-set "STREAM_URL=${streamUrl}"
-set "DURATION=${duration}"
-set "CHUNK_LENGTH=${chunkLength}"
-set "FADE_DURATION=${fadeDuration}"
-set "OUTPUT_DIR=chunks"
-set "OUTPUT_FILE=chunk_"
+rem Set the stream URL
+set STREAM_URL=${streamUrl}
 
-:: Create output directory
-if not exist "%OUTPUT_DIR%" (
-    mkdir "%OUTPUT_DIR%"
+rem Set the download time (in seconds) and chunk duration (in seconds)
+set DOWNLOAD_TIME=${duration}
+set CHUNK_DURATION=${chunkLength}
+
+rem Step 1: Download the stream and split into chunks
+echo Recording stream for %DOWNLOAD_TIME% seconds...
+ffmpeg -i %STREAM_URL% -t %DOWNLOAD_TIME% -c copy temp_stream.mp3
+
+rem Split the downloaded stream into chunks
+echo Splitting the recorded stream into %CHUNK_DURATION%-second chunks...
+ffmpeg -i temp_stream.mp3 -f segment -segment_time %CHUNK_DURATION% -c copy chunk%%03d.mp3
+
+rem Step 2: Apply fade-in and fade-out to each chunk
+echo Applying fade-in and fade-out to each chunk...
+FOR %%A IN (chunk*.mp3) DO (
+    ffmpeg -i %%A -filter_complex "afade=d=2, areverse, afade=d=2, areverse" "%%~dpnA_NEW.mp3"
+    del %%A
 )
 
-:: Start recording
-echo Recording Stream...
-ffmpeg -y -i "%STREAM_URL%" -t %DURATION% -c copy -thread_queue_size 512 "full_record.mp3"
-if %errorlevel% neq 0 (
-    echo Error recording stream.
-    exit /b 1
-)
-
-:: Split into chunks and apply fade effects
-echo Splitting and Adding Fade Effects...
-set /a "num_chunks=(%DURATION% + %CHUNK_LENGTH% - 1) / %CHUNK_LENGTH%"
-for /L %%i in (0,1,%num_chunks%-1) do (
-    set /a "start_time=%%i * %CHUNK_LENGTH%"
-    set /a "fade_out_start=%CHUNK_LENGTH% - %FADE_DURATION%"
-    set "output_file=%OUTPUT_DIR%\\%OUTPUT_FILE%%%i.mp3"
-    ffmpeg -y -i "full_record.mp3" -ss !start_time! -t %CHUNK_LENGTH% -af "afade=t=in:st=0:d=%FADE_DURATION%,afade=t=out:st=!fade_out_start!:d=%FADE_DURATION%" "!output_file!"
-    if %errorlevel% neq 0 (
-        echo Error processing chunk %%i.
-        exit /b 1
-    )
-)
-
-echo Process completed successfully.
-exit /b 0`;
+rem Clean up the temporary file
+del temp_stream.mp3
+echo Done!`;
 
             document.getElementById("script-output").innerText = script;
         }
