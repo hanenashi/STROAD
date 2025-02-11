@@ -24,11 +24,14 @@
             height: 300px;
             resize: vertical;
         }
-        #instructions {
-            background: #f4f4f4;
-            padding: 10px;
-            border-left: 4px solid #333;
-            font-size: 14px;
+        .os-options {
+            display: flex;
+            flex-direction: column;
+        }
+        .os-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
     </style>
 </head>
@@ -52,44 +55,42 @@
         <input type="number" id="fade_duration" required>
 
         <label>Choose OS:</label>
-        <input type="radio" id="win" name="os" value="win" checked onclick="updateInstructions()">
-        <label for="win">Windows</label>
-        <input type="radio" id="mac" name="os" value="mac" onclick="updateInstructions()">
-        <label for="mac">MacOS</label>
+        <div class="os-options">
+            <div class="os-option">
+                <input type="radio" id="win" name="os" value="win" checked>
+                <label for="win">Windows</label>
+            </div>
+            <div class="os-option">
+                <input type="radio" id="mac" name="os" value="mac">
+                <label for="mac">MacOS</label>
+            </div>
+            <div class="os-option">
+                <input type="radio" id="linux" name="os" value="linux">
+                <label for="linux">Linux</label>
+            </div>
+        </div>
 
-        <div id="instructions">Instructions will appear here.</div>
-        
         <button type="button" onclick="generateScript()">Generate Script</button>
     </form>
 
+    <h3>Readme Instructions:</h3>
+    <textarea id="readme-output" readonly></textarea>
+
     <h3>Generated Script:</h3>
-    <textarea id="script-output" readonly></textarea>
+    <textarea id="script-output"></textarea>
     <button onclick="downloadScript()">Download Script</button>
 
     <script>
         function parseDuration(duration) {
-            const regex = /(\d+h)?\s*(\d+m)?\s*(\d+s)?/;
+            const regex = /(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?/;
             const matches = duration.match(regex);
             let totalSeconds = 0;
-
             if (matches[1]) totalSeconds += parseInt(matches[1]) * 3600;
             if (matches[2]) totalSeconds += parseInt(matches[2]) * 60;
             if (matches[3]) totalSeconds += parseInt(matches[3]);
-
             return totalSeconds;
         }
 
-        function updateInstructions() {
-            const osType = document.querySelector('input[name="os"]:checked').value;
-            const instructions = document.getElementById("instructions");
-            
-            if (osType === "win") {
-                instructions.innerHTML = "To run the Windows script: Download the .bat file, then double-click it to start recording.";
-            } else {
-                instructions.innerHTML = "To run the Mac script: Open Terminal, navigate to the script folder, then run: <code>chmod +x stroad.sh && ./stroad.sh</code>";
-            }
-        }
-        
         function generateScript() {
             const streamUrl = document.getElementById("stream_url").value;
             const chunkName = document.getElementById("chunk_name").value;
@@ -99,13 +100,17 @@
             const osType = document.querySelector('input[name="os"]:checked').value;
 
             let script = "";
+            let readme = "";
+
             if (osType === "win") {
-                script = `@echo off\n\nrem Step 1: Download the stream and split into chunks\necho Recording stream for ${duration} seconds...\nffmpeg -i ${streamUrl} -t ${duration} -c copy temp_stream.mp3\n\nrem Split into chunks\necho Splitting the stream...\nffmpeg -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%%03d.mp3\n\nrem Apply fade-in and fade-out\nset /a count=1\nFOR %%A IN (temp_chunk*.mp3) DO (\n    setlocal enabledelayedexpansion\n    set "padded_count=00!count!"\n    set "padded_count=!padded_count:~-3!"\n    ffmpeg -i %%A -filter_complex "afade=t=in:d=${fadeDuration}, areverse, afade=t=in:d=${fadeDuration}, areverse" "${chunkName}_!padded_count!.mp3"\n    del %%A\n    endlocal\n    set /a count+=1\n)\n\ndel temp_stream.mp3\necho Done!`;
+                script = `@echo off\n\nrem Step 1: Download the stream and split into chunks\necho Recording stream for ${duration} seconds...\nffmpeg -thread_queue_size 512 -i ${streamUrl} -t ${duration} -c copy temp_stream.mp3\n\nrem Split the recorded stream into chunks\necho Splitting the recorded stream into ${chunkLength}-second chunks...\nffmpeg -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%%03d.mp3\n\nrem Step 2: Apply fade-in and fade-out to each chunk and rename\necho Applying fade-in and fade-out...\nset /a count=1\nFOR %%A IN (temp_chunk*.mp3) DO (\n    setlocal enabledelayedexpansion\n    set "padded_count=00!count!"\n    set "padded_count=!padded_count:~-3!"\n    ffmpeg -i %%A -filter_complex "afade=d=${fadeDuration}, areverse, afade=d=${fadeDuration}, areverse" "${chunkName}_!padded_count!.mp3"\n    del %%A\n    endlocal\n    set /a count+=1\n)\ndel temp_stream.mp3\necho Done!`;
+                readme = "Run the script by double-clicking the .bat file in Windows.";
             } else {
-                script = `#!/bin/bash\n\necho "Recording stream for ${duration} seconds..."\nffmpeg -i "${streamUrl}" -t ${duration} -c copy temp_stream.mp3\n\necho "Splitting the stream..."\nffmpeg -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%03d.mp3\n\necho "Applying fade-in and fade-out..."\ncount=1\nfor file in temp_chunk*.mp3; do\n    padded_count=$(printf "%03d" $count)\n    ffmpeg -i "$file" -filter_complex "afade=t=in:d=${fadeDuration}, areverse, afade=t=in:d=${fadeDuration}, areverse" "${chunkName}_$padded_count.mp3"\n    rm "$file"\n    ((count++))\ndone\n\nrm temp_stream.mp3\necho "Done!"`;
+                script = `#!/bin/bash\n\necho "Recording stream for ${duration} seconds..."\nffmpeg -thread_queue_size 512 -i "${streamUrl}" -t ${duration} -c copy temp_stream.mp3\n\necho "Splitting the recorded stream..."\nffmpeg -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%03d.mp3\n\necho "Applying fade-in and fade-out..."\ncount=1\nfor file in temp_chunk*.mp3; do\n    padded_count=$(printf "%03d" $count)\n    ffmpeg -i "$file" -filter_complex "afade=d=${fadeDuration}, areverse, afade=d=${fadeDuration}, areverse" "${chunkName}_$padded_count.mp3"\n    rm "$file"\n    ((count++))\ndone\nrm temp_stream.mp3\necho "Done!"`;
+                readme = "Run 'chmod +x stroad.sh' to make the script executable, then run './stroad.sh' in the terminal.";
             }
-            
             document.getElementById("script-output").value = script;
+            document.getElementById("readme-output").value = readme;
         }
 
         function downloadScript() {
