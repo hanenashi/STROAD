@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FFmpeg Stream Recorder STROAD</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            max-width: 600px;
+        }
+        label {
+            font-weight: bold;
+        }
+        input, button, textarea {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 8px;
+        }
+        textarea {
+            height: 300px;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>FFmpeg Stream Recorder STROAD</h2>
+    <form id="ffmpeg-form">
+        <label for="stream_url">Stream URL:</label>
+        <input type="text" id="stream_url" value="https://live.amperwave.net/direct/ppm-jazz24mp3-ibc1" required>
+
+        <label for="chunk_name">Chunk Name:</label>
+        <input type="text" id="chunk_name" value="Jazz" required>
+
+        <label for="duration">Total Recording Time (e.g., 1h 20m 40s):</label>
+        <input type="text" id="duration" required>
+
+        <label for="chunk_length">Chunk Length (e.g., 1h 20m 40s):</label>
+        <input type="text" id="chunk_length" required>
+
+        <label for="fade_duration">Fade In/Out Duration (seconds):</label>
+        <input type="number" id="fade_duration" required>
+
+        <button type="button" onclick="generateScript()">Generate Script</button>
+    </form>
+
+    <h3>Generated Batch Script:</h3>
+    <textarea id="script-output"></textarea>
+    <button onclick="downloadScript()">Download Script</button>
+
+    <script>
+        function parseDuration(duration) {
+            const regex = /(\d+h)?\s*(\d+m)?\s*(\d+s)?/;
+            const matches = duration.match(regex);
+            let totalSeconds = 0;
+
+            if (matches[1]) {
+                totalSeconds += parseInt(matches[1]) * 3600;
+            }
+            if (matches[2]) {
+                totalSeconds += parseInt(matches[2]) * 60;
+            }
+            if (matches[3]) {
+                totalSeconds += parseInt(matches[3]);
+            }
+
+            return totalSeconds;
+        }
+
+        function generateScript() {
+            const streamUrl = document.getElementById("stream_url").value;
+            const chunkName = document.getElementById("chunk_name").value;
+            const duration = parseDuration(document.getElementById("duration").value);
+            const chunkLength = parseDuration(document.getElementById("chunk_length").value);
+            const fadeDuration = document.getElementById("fade_duration").value;
+
+            const script = `@echo off
+
+rem Step 1: Download the stream and split into chunks
+echo Recording stream for ${duration} seconds...
+ffmpeg -thread_queue_size 512 -i ${streamUrl} -t ${duration} -c copy temp_stream.mp3
+
+rem Split the downloaded stream into ${chunkLength}-second chunks...
+echo Splitting the recorded stream into ${chunkLength}-second chunks...
+ffmpeg -thread_queue_size 512 -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%%03d.mp3
+
+rem Step 2: Apply fade-in and fade-out to each chunk and rename
+echo Applying fade-in and fade-out to each chunk...
+set /a count=1
+FOR %%A IN (temp_chunk*.mp3) DO (
+    setlocal enabledelayedexpansion
+    set "padded_count=00!count!"
+    set "padded_count=!padded_count:~-3!"
+    ffmpeg -i %%A -filter_complex "afade=d=${fadeDuration}, areverse, afade=d=${fadeDuration}, areverse" -thread_queue_size 512 "${chunkName}_!padded_count!.mp3"
+    del %%A
+    endlocal
+    set /a count+=1
+)
+
+rem Clean up the temporary file
+del temp_stream.mp3
+echo Done!`;
+
+            document.getElementById("script-output").value = script;
+        }
+
+        function downloadScript() {
+            const scriptContent = document.getElementById("script-output").value;
+            const blob = new Blob([scriptContent], { type: "text/plain" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "stroad.bat";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+
+</body>
+</html>
