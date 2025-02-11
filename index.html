@@ -45,6 +45,12 @@
         <label for="fade_duration">Fade In/Out Duration (seconds):</label>
         <input type="number" id="fade_duration" required>
 
+        <label>Choose OS:</label>
+        <input type="radio" id="win" name="os" value="win" checked>
+        <label for="win">Windows</label>
+        <input type="radio" id="mac" name="os" value="mac">
+        <label for="mac">MacOS</label>
+
         <button type="button" onclick="generateScript()">Generate Script</button>
     </form>
 
@@ -77,67 +83,26 @@
             const duration = parseDuration(document.getElementById("duration").value);
             const chunkLength = parseDuration(document.getElementById("chunk_length").value);
             const fadeDuration = document.getElementById("fade_duration").value;
+            const osType = document.querySelector('input[name="os"]:checked').value;
 
-            const windowsScript = `@echo off
-
-rem Step 1: Download the stream and split into chunks
-echo Recording stream for ${duration} seconds...
-ffmpeg -thread_queue_size 512 -i ${streamUrl} -t ${duration} -c copy temp_stream.mp3
-
-rem Split the downloaded stream into ${chunkLength}-second chunks...
-echo Splitting the recorded stream into ${chunkLength}-second chunks...
-ffmpeg -thread_queue_size 512 -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%%03d.mp3
-
-rem Step 2: Apply fade-in and fade-out to each chunk and rename
-echo Applying fade-in and fade-out to each chunk...
-set /a count=1
-FOR %%A IN (temp_chunk*.mp3) DO (
-    setlocal enabledelayedexpansion
-    set "padded_count=00!count!"
-    set "padded_count=!padded_count:~-3!"
-    ffmpeg -i %%A -filter_complex "afade=d=${fadeDuration}, areverse, afade=d=${fadeDuration}, areverse" -thread_queue_size 512 "${chunkName}_!padded_count!.mp3"
-    del %%A
-    endlocal
-    set /a count+=1
-)
-
-rem Clean up the temporary file
-del temp_stream.mp3
-echo Done!`;
-
-            const macScript = `#!/bin/bash
-
-# Step 1: Download the stream and split into chunks
-echo "Recording stream for ${duration} seconds..."
-ffmpeg -thread_queue_size 512 -i "${streamUrl}" -t ${duration} -c copy temp_stream.mp3
-
-# Split the downloaded stream into ${chunkLength}-second chunks
-echo "Splitting the recorded stream into ${chunkLength}-second chunks..."
-ffmpeg -thread_queue_size 512 -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%03d.mp3
-
-# Step 2: Apply fade-in and fade-out to each chunk and rename
-echo "Applying fade-in and fade-out to each chunk..."
-count=1
-for file in temp_chunk*.mp3; do
-    padded_count=$(printf "%03d" "$count")
-    ffmpeg -i "$file" -filter_complex "afade=d=${fadeDuration}, areverse, afade=d=${fadeDuration}, areverse" -thread_queue_size 512 "${chunkName}_$padded_count.mp3"
-    rm "$file"
-    count=$((count+1))
-done
-
-# Clean up the temporary file
-rm temp_stream.mp3
-echo "Done!"`;
-
-            document.getElementById("script-output").value = `Windows Batch Script:\n\n${windowsScript}\n\nmacOS/Linux Shell Script:\n\n${macScript}`;
+            let script = "";
+            if (osType === "win") {
+                script = `@echo off\n\nrem Step 1: Download the stream and split into chunks\necho Recording stream for ${duration} seconds...\nffmpeg -thread_queue_size 512 -i ${streamUrl} -t ${duration} -c copy temp_stream.mp3\n\nrem Split the downloaded stream into ${chunkLength}-second chunks\necho Splitting the recorded stream into ${chunkLength}-second chunks...\nffmpeg -thread_queue_size 512 -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%%03d.mp3\n\nrem Step 2: Apply fade-in and fade-out to each chunk and rename\necho Applying fade-in and fade-out to each chunk...\nset /a count=1\nFOR %%A IN (temp_chunk*.mp3) DO (\n    setlocal enabledelayedexpansion\n    set "padded_count=00!count!"\n    set "padded_count=!padded_count:~-3!"\n    ffmpeg -i %%A -filter_complex "afade=d=${fadeDuration}, areverse, afade=d=${fadeDuration}, areverse" -thread_queue_size 512 "${chunkName}_!padded_count!.mp3"\n    del %%A\n    endlocal\n    set /a count+=1\n)\n\nrem Clean up the temporary file\ndel temp_stream.mp3\necho Done!`;
+            } else {
+                script = `#!/bin/bash\n\n# Step 1: Download the stream and split into chunks\necho "Recording stream for ${duration} seconds..."\nffmpeg -thread_queue_size 512 -i "${streamUrl}" -t ${duration} -c copy temp_stream.mp3\n\n# Split the downloaded stream into ${chunkLength}-second chunks\necho "Splitting the recorded stream into ${chunkLength}-second chunks..."\nffmpeg -thread_queue_size 512 -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%03d.mp3\n\n# Step 2: Apply fade-in and fade-out to each chunk and rename\necho "Applying fade-in and fade-out to each chunk..."\ncount=1\nfor file in temp_chunk*.mp3; do\n    padded_count=$(printf "%03d" $count)\n    ffmpeg -i "$file" -filter_complex "afade=d=${fadeDuration}, areverse, afade=d=${fadeDuration}, areverse" -thread_queue_size 512 "${chunkName}_$padded_count.mp3"\n    rm "$file"\n    ((count++))\ndone\n\n# Clean up the temporary file\nrm temp_stream.mp3\necho "Done!"`;
+            }
+            
+            document.getElementById("script-output").value = script;
         }
 
         function downloadScript() {
             const scriptContent = document.getElementById("script-output").value;
+            const osType = document.querySelector('input[name="os"]:checked').value;
+            const extension = osType === "win" ? "bat" : "sh";
             const blob = new Blob([scriptContent], { type: "text/plain" });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = "STROAD.txt";
+            a.download = `stroad.${extension}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
