@@ -43,9 +43,12 @@
         <label for="fade_duration">Fade In/Out Duration (seconds):</label>
         <input type="number" id="fade_duration" required>
 
+        <label for="script_name">Output File Name (without extension):</label>
+        <input type="text" id="script_name" placeholder="Enter script name" required>
+
         <label>Choose OS:</label>
-        <input type="checkbox" id="win_checkbox" onclick="toggleOS('win')"> Windows
-        <input type="checkbox" id="mac_checkbox" onclick="toggleOS('mac')"> MacOS
+        <input type="radio" id="win_checkbox" name="os_select" onclick="setOS('win')" checked> Windows
+        <input type="radio" id="mac_checkbox" name="os_select" onclick="setOS('mac')"> MacOS
 
         <button type="button" onclick="generateScript()">Generate Script</button>
     </form>
@@ -57,16 +60,8 @@
     <script>
         let selectedOS = "win"; // Default to Windows
 
-        function toggleOS(os) {
-            if (os === "win") {
-                document.getElementById("win_checkbox").checked = true;
-                document.getElementById("mac_checkbox").checked = false;
-                selectedOS = "win";
-            } else {
-                document.getElementById("win_checkbox").checked = false;
-                document.getElementById("mac_checkbox").checked = true;
-                selectedOS = "mac";
-            }
+        function setOS(os) {
+            selectedOS = os;
         }
 
         function parseDuration(duration) {
@@ -86,6 +81,12 @@
             const duration = parseDuration(document.getElementById("duration").value);
             const chunkLength = parseDuration(document.getElementById("chunk_length").value);
             const fadeDuration = document.getElementById("fade_duration").value;
+            const scriptName = document.getElementById("script_name").value.trim();
+
+            if (!scriptName) {
+                alert("Please enter a script name!");
+                return;
+            }
 
             let script = "";
 
@@ -138,10 +139,17 @@ echo "Done!"`;
 
         function downloadScript() {
             const scriptContent = document.getElementById("script-output").value;
+            const scriptName = document.getElementById("script_name").value.trim();
+
+            if (!scriptName) {
+                alert("Please enter a script name before downloading!");
+                return;
+            }
+
             const blob = new Blob([scriptContent], { type: "text/plain" });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = selectedOS === "win" ? "ffmpeg_script.bat" : "ffmpeg_script.sh";
+            a.download = selectedOS === "win" ? `${scriptName}.bat` : `${scriptName}.sh`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
