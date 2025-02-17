@@ -173,9 +173,9 @@ convert_to_seconds() {
     local total=0
 
     # Extract hours, minutes, and seconds
-    if [[ $input =~ ([0-9]+)h ]]; then total=$((total + BASH_REMATCH[1] * 3600)); fi
-    if [[ $input =~ ([0-9]+)m ]]; then total=$((total + BASH_REMATCH[1] * 60)); fi
-    if [[ $input =~ ([0-9]+)s ]]; then total=$((total + BASH_REMATCH[1])); fi
+    if [[ $input =~ ([0-9]+)h ]]; then total=$((total + ${BASH_REMATCH[1]} * 3600)); fi
+    if [[ $input =~ ([0-9]+)m ]]; then total=$((total + ${BASH_REMATCH[1]} * 60)); fi
+    if [[ $input =~ ([0-9]+)s ]]; then total=$((total + ${BASH_REMATCH[1]})); fi
 
     echo $total
 }
