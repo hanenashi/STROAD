@@ -21,7 +21,7 @@
             padding: 8px;
         }
         textarea {
-            height: 100px;
+            height: 300px;
             resize: vertical;
         }
         .os-options {
@@ -73,10 +73,6 @@
             <div class="os-option">
                 <input type="radio" id="linux" name="os" value="linux">
                 <label for="linux">Linux</label>
-            </div>
-            <div class="os-option">
-                <input type="radio" id="android" name="os" value="android">
-                <label for="android">Android</label>
             </div>
         </div>
 
@@ -138,7 +134,7 @@ FOR %%A IN (temp_chunk*.mp3) DO (
 del temp_stream.mp3
 echo Done!`;
                 readme = "Run the script by double-clicking the .bat file in Windows.";
-            } else if (osType === "mac" || osType === "linux") {
+            } else {
                 script = `#!/bin/bash
 
 echo "Recording stream for ${duration} seconds..."
@@ -158,188 +154,6 @@ done
 rm temp_stream.mp3
 echo "Done!"`;
                 readme = "Run 'chmod +x stroad.sh' to make the script executable, then run './stroad.sh' in the terminal.";
-            } else if (osType === "android") {
-                script = `#!/bin/bash
-
-# Request storage access (run this once manually before using the script)
-termux-setup-storage
-
-# Keep device awake
-termux-wake-lock
-
-# Function to convert time format to seconds
-convert_to_seconds() {
-    local input="$1"
-    local total=0
-
-    # Extract hours, minutes, and seconds
-    if [[ $input =~ ([0-9]+)h ]]; then total=$((total + ${BASH_REMATCH[1]} * 3600)); fi
-    if [[ $input =~ ([0-9]+)m ]]; then total=$((total + ${BASH_REMATCH[1]} * 60)); fi
-    if [[ $input =~ ([0-9]+)s ]]; then total=$((total + ${BASH_REMATCH[1]})); fi
-
-    echo $total
-}
-
-# Set stream URL
-STREAM_URL="${streamUrl}"
-
-# Set total recording time
-TOTAL_TIME="${duration}"
-DURATION=$(convert_to_seconds "$TOTAL_TIME")
-
-# Set chunk length
-CHUNK_TIME="${chunkLength}"
-CHUNK_LENGTH=$(convert_to_seconds "$CHUNK_TIME")
-
-# Set fade duration
-FADE="${fadeDuration}"
-
-# Set chunk filename prefix
-CHUNK_PREFIX="${chunkName}"
-
-# Set saving location
-OUTPUT_DIR="/sdcard/download/termux"
-
-# Display summary for confirmation
-echo ""
-echo "----- Recording Settings -----"
-echo " Stream URL:    $STREAM_URL"
-echo " Total Time:    $TOTAL_TIME ($DURATION seconds)"
-echo " Chunk Time:    $CHUNK_TIME ($CHUNK_LENGTH seconds)"
-echo " Fade In/Out:   $FADE seconds"
-echo " Chunk Prefix:  $CHUNK_PREFIX"
-echo " Save Location: $OUTPUT_DIR"
-echo "--------------------------------"
-
-read -p "Confirm settings? (y/n): " CONFIRM
-if [[ "$CONFIRM" != "y" ]]; then
-    echo "Aborted!"
-    termux-wake-unlock
-    exit 1
-fi
-
-# Create output directory if it doesn't exist
-mkdir -p "$OUTPUT_DIR"
-cd "$OUTPUT_DIR"
-
-# Start recording
-echo "Recording stream for $TOTAL_TIME..."
-ffmpeg -thread_queue_size 512 -i "$STREAM_URL" -t "$DURATION" -c copy "temp_stream.mp3"
-
-# Check if recording succeeded
-if [ ! -f "temp_stream.mp3" ]; then
-    echo "Recording failed!"
-    termux-wake-unlock
-    exit 1
-fi
-
-# Split into chunks
-echo "Splitting into $CHUNK_LENGTH-second chunks..."
-ffmpeg -i "temp_stream.mp3" -f segment -segment_time "$CHUNK_LENGTH" -c copy "temp_chunk%03d.mp3"
-
-# Apply fade in/out to each chunk
-echo "Applying fade effect..."
-COUNT=1
-for FILE in temp_chunk*.mp3; do
-    PADDED_COUNT=$(printf "%03d" $COUNT)
-    ffmpeg -i "$FILE" -filter_complex "afade=t=in:ss=0:d=$FADE, areverse, afade=t=in:ss=0:d=$FADE, areverse" -c:a libmp3lame -q:a 2 "$OUTPUT_DIR/${CHUNK_PREFIX}_${PADDED_COUNT}.mp3"
-    rm -f "$FILE"
-    ((COUNT++))
-done
-
-# Clean up
-rm -f "temp_stream.mp3"
-termux-wake-unlock
-
-echo "Done! Chunks saved in $OUTPUT_DIR"`;
-                readme = `### Android Instructions:
-1. **Grant Storage Access** (run this once manually before using the script):
-   \`\`\`
-   termux-setup-storage
-   \`\`\`
-2. **Keep Device Awake**:
-   \`\`\`
-   termux-wake-lock
-   \`\`\`
-3. **Navigate to the Download/Termux Folder**:
-   \`\`\`
-   cd /sdcard/download/termux
-   \`\`\`
-   or
-   \`\`\`
-   cd ~/storage/downloads/termux
-   \`\`\`
-4. **Verify Your Location**:
-   \`\`\`
-   pwd
-   \`\`\`
-   It should output:
-   \`\`\`
-   /sdcard/download/termux
-   \`\`\`
-5. **List Files in the Folder**:
-   \`\`\`
-   ls -lah
-   \`\`\`
-6. **Make the Script Executable**:
-   \`\`\`
-   chmod +x stra.sh
-   \`\`\`
-7. **Run the Script**:
-   \`\`\`
-   bash stra.sh
-   \`\`\`
-8. **Create a Shortcut for Termux:Widget**:
-   - Install Termux:Widget from F-Droid or Google Play.
-   - Create a new script inside \`~/.shortcuts/\`, for example:
-     \`\`\`
-     nano ~/.shortcuts/Start_Recording.sh
-     \`\`\`
-     Add the following to run \`stra.sh\`:
-     \`\`\`
-     #!/data/data/com.termux/files/usr/bin/bash
-     bash ~/bin/stra.sh
-     \`\`\`
-     Save and exit (Ctrl + X, then Y, then Enter).
-   - Make the script executable:
-     \`\`\`
-     chmod +x ~/.shortcuts/Start_Recording.sh
-     \`\`\`
-   - Enable Termux:Widget on Home Screen:
-     - Long-press on the home screen → Widgets
-     - Find Termux:Widget and drag it onto the home screen
-     - Tap the widget and select \`Start_Recording.sh\`
-   - Now, tapping the widget will launch \`stra.sh\`!
-9. **Enable "Display over other apps" Permission**:
-   - Open Android Settings
-   - Navigate to Apps & notifications (or just Apps on some devices)
-   - Find and select Termux
-   - Scroll down and tap Advanced → Display over other apps
-   - Enable "Allow display over other apps"
-10. **Edit the Script**:
-    - Use Termux's built-in file manager:
-      \`\`\`
-      termux-open ~/.shortcuts/Start_Recording.sh
-      \`\`\`
-      or
-      \`\`\`
-      termux-open ~/bin/stra.sh
-      \`\`\`
-    - Or copy the script to an accessible location, edit it, and move it back:
-      \`\`\`
-      cp ~/bin/stra.sh /sdcard/Download/stra.sh
-      mv /sdcard/Download/stra.sh ~/bin/stra.sh
-      chmod +x ~/bin/stra.sh
-      \`\`\`
-    - Or edit within Termux:
-      \`\`\`
-      nano ~/bin/stra.sh
-      \`\`\`
-      or
-      \`\`\`
-      vim ~/bin/stra.sh
-      \`\`\`
-`;
             }
             document.getElementById("script-output").value = script;
             document.getElementById("readme-output").value = readme;
