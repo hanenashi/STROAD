@@ -180,25 +180,28 @@ convert_to_seconds() {
     echo $total
 }
 
-# Set stream URL
-STREAM_URL="${streamUrl}"
+# Ask for stream URL (default: Jazz24)
+read -p "Enter stream URL [Default: Jazz24]: " STREAM_URL
+STREAM_URL=${STREAM_URL:-"https://live.amperwave.net/direct/ppm-jazz24mp3-ibc1"}
 
-# Set total recording time
-TOTAL_TIME="${duration}"
+# Ask for total recording time
+read -p "Enter total recording time (e.g., 10h 20m 40s): " TOTAL_TIME
 DURATION=$(convert_to_seconds "$TOTAL_TIME")
 
-# Set chunk length
-CHUNK_TIME="${chunkLength}"
+# Ask for chunk length
+read -p "Enter chunk length (e.g., 10h 20m 40s): " CHUNK_TIME
 CHUNK_LENGTH=$(convert_to_seconds "$CHUNK_TIME")
 
-# Set fade duration
-FADE="${fadeDuration}"
+# Ask for fade duration (seconds only)
+read -p "Enter fade-in/out duration (seconds): " FADE
 
-# Set chunk filename prefix
-CHUNK_PREFIX="${chunkName}"
+# Ask for chunk filename prefix
+read -p "Enter chunk name prefix (e.g., Jazz): " CHUNK_PREFIX
+CHUNK_PREFIX=${CHUNK_PREFIX:-"Chunk"}  # Default if left blank
 
-# Set saving location
-OUTPUT_DIR="/sdcard/download/termux"
+# Ask for saving location (default: /sdcard/download/termux)
+read -p "Enter save location [Default: /sdcard/download/termux]: " OUTPUT_DIR
+OUTPUT_DIR=${OUTPUT_DIR:-"/sdcard/download/termux"}
 
 # Display summary for confirmation
 echo ""
