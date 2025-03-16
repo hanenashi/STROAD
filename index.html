@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FFmpeg Stream Recorder STROAD</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            max-width: 600px;
+        }
+        label {
+            font-weight: bold;
+        }
+        input, button, select, textarea {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 8px;
+        }
+        textarea {
+            height: 300px;
+            resize: vertical;
+        }
+        .os-options {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .os-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .readme-output {
+            height: auto;
+            min-height: 50px;
+            resize: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>FFmpeg Stream Recorder STROAD</h2>
+    <form id="ffmpeg-form">
+        <label for="stream_url">Stream URL (or pick a preset):</label>
+        <select id="stream_url" onchange="updateCustomUrl()">
+            <option value="https://live.amperwave.net/direct/ppm-jazz24mp3-ibc1">Jazz24</option>
+            <option value="http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio1_mf_p">BBC Radio 1</option>
+            <option value="https://somafm.com/groovesalad256.pls">SomaFM Groove Salad</option>
+            <option value="custom">Custom</option>
+        </select>
+        <input type="text" id="custom_url" placeholder="Enter custom URL" style="display:none;">
+
+        <label for="chunk_name">Chunk Name:</label>
+        <input type="text" id="chunk_name" value="Jazz" required>
+
+        <label for="duration">Total Recording Time (e.g., 1h 20m 40s):</label>
+        <input type="text" id="duration" required>
+
+        <label for="chunk_length">Chunk Length (e.g., 1h 20m 40s):</label>
+        <input type="text" id="chunk_length" required>
+
+        <label for="fade_duration">Fade In/Out Duration (seconds):</label>
+        <input type="number" id="fade_duration" required>
+
+        <label>Choose OS:</label>
+        <div class="os-options">
+            <div class="os-option">
+                <input type="radio" id="win" name="os" value="win" checked>
+                <label for="win">Windows</label>
+            </div>
+            <div class="os-option">
+                <input type="radio" id="mac" name="os" value="mac">
+                <label for="mac">MacOS</label>
+            </div>
+            <div class="os-option">
+                <input type="radio" id="linux" name="os" value="linux">
+                <label for="linux">Linux</label>
+            </div>
+        </div>
+
+        <button type="button" onclick="generateScript()">Generate Script</button>
+        <button type="button" onclick="openTermuxScript()">View Termux Script</button>
+    </form>
+
+    <h3>Readme Instructions:</h3>
+    <textarea id="readme-output" class="readme-output" readonly></textarea>
+
+    <h3>Generated Script:</h3>
+    <textarea id="script-output"></textarea>
+    <button onclick="downloadScript()">Download Script</button>
+
+    <script>
+        function parseDuration(duration) {
+            const regex = /(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?/;
+            const matches = duration.match(regex);
+            let totalSeconds = 0;
+            if (matches[1]) totalSeconds += parseInt(matches[1]) * 3600;
+            if (matches[2]) totalSeconds += parseInt(matches[2]) * 60;
+            if (matches[3]) totalSeconds += parseInt(matches[3]);
+            return totalSeconds;
+        }
+
+        function updateCustomUrl() {
+            const streamSelect = document.getElementById("stream_url");
+            const customUrl = document.getElementById("custom_url");
+            customUrl.style.display = streamSelect.value === "custom" ? "block" : "none";
+        }
+
+        function generateScript() {
+            const streamSelect = document.getElementById("stream_url").value;
+            const customUrl = document.getElementById("custom_url").value;
+            const streamUrl = streamSelect === "custom" ? customUrl : streamSelect;
+            const chunkName = document.getElementById("chunk_name").value;
+            const duration = parseDuration(document.getElementById("duration").value);
+            const chunkLength = parseDuration(document.getElementById("chunk_length").value);
+            const fadeDuration = document.getElementById("fade_duration").value;
+            const osType = document.querySelector('input[name="os"]:checked').value;
+            const totalChunks = Math.ceil(duration / chunkLength);
+
+            let script = "";
+            let readme = "";
+
+            if (osType === "win") {
+                script = `@echo off
+ECHO Recording stream for ${duration} seconds...
+ffmpeg -loglevel quiet -thread_queue_size 512 -i "${streamUrl}" -t ${duration} -c copy temp_stream.mp3
+
+ECHO Splitting into ${chunkLength}-second chunks...
+ffmpeg -loglevel quiet -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%%03d.mp3
+
+ECHO Applying fade effect...
+SET /A count=1
+SET "timestamp=%DATE:~6,4%%DATE:~3,2%%DATE:~0,2%_%TIME:~0,2%%TIME:~3,2%"
+SET "timestamp=%timestamp: =0%"
+FOR %%A IN (temp_chunk*.mp3) DO (
+    SETLOCAL ENABLEDELAYEDEXPANSION
+    SET "padded_count=00!count!"
+    SET "padded_count=!padded_count:~-3!"
+    ECHO Processing chunk !count!/${totalChunks}: !padded_count!.mp3
+    ffmpeg -loglevel quiet -i "%%A" -filter_complex "afade=d=${fadeDuration},areverse,afade=d=${fadeDuration},areverse" "${chunkName}_%timestamp%_!padded_count!.mp3"
+    DEL "%%A"
+    ENDLOCAL
+    SET /A count+=1
+)
+DEL temp_stream.mp3
+ECHO Done!`;
+                readme = "1. Ensure FFmpeg is installed and added to PATH.\n2. Save this as 'stroad.bat'.\n3. Double-click to run in Windows.";
+            } else {
+                script = `#!/bin/bash
+
+echo "Recording stream for ${duration} seconds..."
+ffmpeg -loglevel quiet -thread_queue_size 512 -i "${streamUrl}" -t ${duration} -c copy temp_stream.mp3
+
+echo "Splitting into ${chunkLength}-second chunks..."
+ffmpeg -loglevel quiet -i temp_stream.mp3 -f segment -segment_time ${chunkLength} -c copy temp_chunk%03d.mp3
+
+echo "Applying fade effect..."
+count=1
+timestamp=$(date +"%Y%m%d_%H%M")
+for file in temp_chunk*.mp3; do
+    padded_count=$(printf "%03d" $count)
+    echo "Processing chunk $count/${totalChunks}: $padded_count.mp3"
+    ffmpeg -loglevel quiet -i "$file" -filter_complex "afade=d=${fadeDuration},areverse,afade=d=${fadeDuration},areverse" "${chunkName}_\${timestamp}_\${padded_count}.mp3"
+    rm "$file"
+    ((count++))
+done
+rm temp_stream.mp3
+echo "Done!"`;
+                readme = "1. Ensure FFmpeg is installed (e.g., 'brew install ffmpeg' on Mac, 'sudo apt install ffmpeg' on Linux).\n2. Save as 'stroad.sh'.\n3. Run 'chmod +x stroad.sh', then './stroad.sh'.";
+            }
+            document.getElementById("script-output").value = script;
+            document.getElementById("readme-output").value = readme;
+        }
+
+        function downloadScript() {
+            const scriptContent = document.getElementById("script-output").value;
+            const osType = document.querySelector('input[name="os"]:checked').value;
+            const extension = osType === "win" ? "bat" : "sh";
+            const blob = new Blob([scriptContent], { type: "text/plain" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `stroad.${extension}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function openTermuxScript() {
+            window.open('https://raw.githubusercontent.com/hanenashi/STROAD/main/stroad%20termux.sh', '_blank');
+        }
+    </script>
+</body>
+</html>
