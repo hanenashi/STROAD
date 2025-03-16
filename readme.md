@@ -1,5 +1,3 @@
-\`\`\`html
-
 # STROAD: Internet Radio Stream Recorder for Android via Termux
 
 STROAD is a Bash script for Termux on Android that records internet radio streams, splits them into chunks, and applies fade-in/out effects. This guide walks you through installing and setting it up on your Android device (tested on a Pixel 8), including Termux widget integration for easy access.
